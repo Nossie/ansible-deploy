@@ -1,0 +1,27 @@
+# pipelines/discover-os.yml
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - script: |
+      echo "Scanning datastore for OS templates..."
+      # Example: replace this with API call or vCenter CLI/PowerCLI
+      OS_LIST="Linux-Debian-12 Linux-Ubuntu-2404 W2K12_NieuwV2 W2k16_NieuwV2 W2k19_NieuwV2 W2K22_NieuwV1 W2K8R2_NieuwV2"
+
+      echo "parameters:" > pipeline-parameters.yml
+      echo "  - name: os_choice" >> pipeline-parameters.yml
+      echo "    displayName: 'Select OS Template'" >> pipeline-parameters.yml
+      echo "    type: string" >> pipeline-parameters.yml
+      echo "    values:" >> pipeline-parameters.yml
+
+      for os in $OS_LIST; do
+        echo "      - $os" >> pipeline-parameters.yml
+      done
+    displayName: "Discover OS templates"
+
+  - publish: pipeline-parameters.yml
+    artifact: discovered-params
+    displayName: "Publish OS parameters"
+

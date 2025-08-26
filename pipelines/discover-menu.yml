@@ -1,0 +1,31 @@
+# pipelines/discover-menu.yml
+trigger: none
+
+parameters:
+- name: discovery_target
+  displayName: "What do you want to update?"
+  type: string
+  default: full
+  values:
+    - playbooks
+    - os
+    - vlans
+    - cluster
+    - full
+
+stages:
+- stage: Discover
+  jobs:
+  - job: RunDiscovery
+    steps:
+      - ${{ if eq(parameters.discovery_target, 'playbooks') }}:
+        - template: discover-playbooks.yml
+      - ${{ if eq(parameters.discovery_target, 'os') }}:
+        - template: discover-os.yml
+      - ${{ if eq(parameters.discovery_target, 'vlans') }}:
+        - template: discover-vlans.yml
+      - ${{ if eq(parameters.discovery_target, 'cluster') }}:
+        - template: discover-cluster.yml
+      - ${{ if eq(parameters.discovery_target, 'full') }}:
+        - template: discover-full.yml
+

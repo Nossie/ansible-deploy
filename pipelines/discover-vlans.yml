@@ -1,0 +1,27 @@
+# pipelines/discover-vlans.yml
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - script: |
+      echo "Discovering VLANs..."
+      # Replace with real VLAN query if needed
+      VLAN_LIST="VLAN10-Production VLAN20-Management VLAN30-Backup VLAN40-Testing"
+
+      echo "parameters:" > pipeline-parameters.yml
+      echo "  - name: vlan" >> pipeline-parameters.yml
+      echo "    displayName: 'Select VLAN'" >> pipeline-parameters.yml
+      echo "    type: string" >> pipeline-parameters.yml
+      echo "    values:" >> pipeline-parameters.yml
+
+      for v in $VLAN_LIST; do
+        echo "      - $v" >> pipeline-parameters.yml
+      done
+    displayName: "Discover VLANs"
+
+  - publish: pipeline-parameters.yml
+    artifact: discovered-params
+    displayName: "Publish VLAN parameters"
+

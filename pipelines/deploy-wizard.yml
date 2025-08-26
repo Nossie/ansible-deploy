@@ -1,0 +1,102 @@
+# pipelines/deploy-wizard.yml
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+parameters:
+- name: refresh_discovery
+  displayName: "Do you want to refresh discovery dropdowns first?"
+  type: boolean
+  default: false
+
+- name: action_type
+  displayName: "Select Action"
+  type: string
+  values:
+    - New Deployment
+    - Run Playbook/Role
+    - Decommission VM
+    - Cleanup Obsolete VMs
+
+- name: dry_run
+  displayName: "Dry Run?"
+  type: boolean
+  default: false
+
+# Import the static playbook & role parameters (dropdowns)
+- template: pipeline-parameters.yml
+
+stages:
+- stage: main
+  displayName: "Interactive Deployment Wizard"
+  jobs:
+  - job: wizard
+    displayName: "Process Selected Action"
+    steps:
+      - checkout: self
+
+      # ---------- Discovery Refresh ----------
+      - ${{ if eq(parameters.refresh_discovery, true) }}:
+        - script: |
+            echo ">>> Refreshing all dropdowns (playbooks, OS, VLANs, clusters)..."
+            echo "Calling discover-menu.yml with 'full' option"
+            # Trigger discover-menu.yml manually via Azure DevOps REST API
+            # Example (pseudo-code):
+            # az pipelines run --name "discover-menu" --branch $(Build.SourceBranchName) --parameters discovery_target=full
+            echo "Dropdowns will be updated after this step"
+          displayName: "Refresh Discovery Dropdowns"
+
+      # ---------- Show Selected Parameters ----------
+      - script: |
+          echo "Action Type: ${{ parameters.action_type }}"
+          echo "Dry Run: ${{ parameters.dry_run }}"
+        displayName: "Show Selected Parameters"
+
+      # ---------- New Deployment ----------
+      - ${{ if eq(parameters.action_type, 'New Deployment') }}:
+        - script: |
+            echo ">>> New VM Deployment requested"
+            echo "Asking for OS, Version, Cluster, VLAN, Hostname..."
+          displayName: "Prepare Deployment"
+
+        - script: |
+            if [ "${{ parameters.dry_run }}" = "true" ]; then
+              echo "[DRY RUN] ansible-playbook playbooks/deploy-vm.yml --check"
+            else
+              ansible-playbook playbooks/deploy-vm.yml
+            fi
+          displayName: "Run Ansible Deployment"
+
+      # ---------- Run Playbook/Role ----------
+      - ${{ if eq(parameters.action_type, 'Run Playbook/Role') }}:
+        - script: |
+            echo ">>> Running Playbook/Role"
+            echo "Playbook: ${{ parameters.playbook }}"
+            echo "Role: ${{ parameters.role }}"
+          displayName: "Prepare Ad-Hoc Run"
+
+        - script: |
+            if [ "${{ parameters.dry_run }}" = "true" ]; then
+              echo "[DRY RUN] ansible-playbook playbooks/${{ parameters.playbook }} --tags ${{ parameters.role }} --check"
+            else
+              ansible-playbook playbooks/${{ parameters.playbook }} --tags ${{ parameters.role }}
+            fi
+          displayName: "Run Ansible Playbook/Role"
+
+      # ---------- Decommission VM ----------
+      - ${{ if eq(parameters.action_type, 'Decommission VM') }}:
+        - script: |
+            echo ">>> Marking VM for Decommission"
+            # Ask for hostname input
+            # Tag VM, power off, release Infoblox IP
+          displayName: "Decommission VM"
+
+      # ---------- Cleanup Obsolete VMs ----------
+      - ${{ if eq(parameters.action_type, 'Cleanup Obsolete VMs') }}:
+        - script: |
+            echo ">>> Cleaning up obsolete VMs"
+            # Find VMs with 'Needs to be removed' older than 7 days
+            # Delete VM and release Infoblox IP
+          displayName: "Cleanup VMs"
+

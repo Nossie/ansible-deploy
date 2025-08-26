@@ -1,0 +1,37 @@
+# pipelines/discover-playbooks.yml
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - script: |
+      echo "Scanning playbooks and roles..."
+      PLAYBOOKS=$(find playbooks -maxdepth 1 -name "*.yml" -printf "%f\n" | xargs)
+      ROLES=$(ls -1 roles/)
+
+      echo "parameters:" > pipeline-parameters.yml
+
+      # Playbooks
+      echo "  - name: playbook" >> pipeline-parameters.yml
+      echo "    displayName: 'Select Playbook'" >> pipeline-parameters.yml
+      echo "    type: string" >> pipeline-parameters.yml
+      echo "    values:" >> pipeline-parameters.yml
+      for p in $PLAYBOOKS; do
+        echo "      - $p" >> pipeline-parameters.yml
+      done
+
+      # Roles
+      echo "  - name: role" >> pipeline-parameters.yml
+      echo "    displayName: 'Select Role'" >> pipeline-parameters.yml
+      echo "    type: string" >> pipeline-parameters.yml
+      echo "    values:" >> pipeline-parameters.yml
+      for r in $ROLES; do
+        echo "      - $r" >> pipeline-parameters.yml
+      done
+    displayName: "Discover playbooks and roles"
+
+  - publish: pipeline-parameters.yml
+    artifact: discovered-params
+    displayName: "Publish parameters file"
+

@@ -1,0 +1,28 @@
+# pipelines/discover-cluster.yml
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - script: |
+      echo "Discovering clusters and resource pools..."
+      # Replace with real vCenter API or CLI query
+      CLUSTERS="Default-Cluster"
+
+      echo "parameters:" > pipeline-parameters.yml
+      echo "  - name: cluster" >> pipeline-parameters.yml
+      echo "    displayName: 'Select Cluster / Resource Pool'" >> pipeline-parameters.yml
+      echo "    type: string" >> pipeline-parameters.yml
+      echo "    values:" >> pipeline-parameters.yml
+
+      for c in $CLUSTERS; do
+        echo "      - $c" >> pipeline-parameters.yml
+      done
+    displayName: "Discover clusters"
+
+  - publish: pipeline-parameters.yml
+    artifact: discovered-params
+    displayName: "Publish Cluster parameters"
+
+
