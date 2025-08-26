@@ -1,0 +1,30 @@
+---
+- name: Cleanup obsolete VMs
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Find VMs with "Needs to be removed" tag
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vcenter_host }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        validate_certs: no
+      register: vm_info
+
+    - name: Filter VMs older than 7 days
+      set_fact:
+        obsolete_vms: >-
+          {{
+            vm_info.virtual_machines
+            | selectattr('tags', 'defined')
+            | selectattr('tags', 'search', 'Needs to be removed - ')
+            | selectattr('tags', 'search', '(?<!.*' + (ansible_date_time.date | string) + ')')
+            | list
+          }}
+
+    - name: Remove VM, DNS, and release IP
+      include_tasks: cleanup_vm_tasks.yml
+      loop: "{{ obsolete_vms }}"
+      loop_control:
+        loop_var: vm
+

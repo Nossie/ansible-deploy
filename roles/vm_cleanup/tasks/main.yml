@@ -1,0 +1,57 @@
+i---
+- name: "Cleanup obsolete VM: {{ vm.name }}"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    infoblox_wapi_url: "https://infoblox.zorg.local/wapi/v2.13"
+    infoblox_user: "{{ vault_infoblox_user }}"
+    infoblox_password: "{{ vault_infoblox_pass }}"
+    network_view: "default"
+
+  tasks:
+    - name: "Get VM info from vCenter"
+      community.vmware.vmware_vm_info:
+        hostname: "{{ vcenter_host }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        validate_certs: no
+        name: "{{ vm.name }}"
+      register: vm_details
+
+    - name: "Set VM IP fact (assuming single NIC)"
+      set_fact:
+        vm_ip: "{{ vm_details.virtual_machines[0].guest_ip_address }}"
+
+    - name: "Release IP from Infoblox"
+      community.general.infoblox_ip_assignment:
+        wapi_url: "{{ infoblox_wapi_url }}"
+        username: "{{ infoblox_user }}"
+        password: "{{ infoblox_password }}"
+        host: "{{ vm.name }}"
+        state: absent
+        force: yes
+      when: vm_ip is defined
+
+    - name: "Delete DNS record in Infoblox"
+      community.general.infoblox_record:
+        wapi_url: "{{ infoblox_wapi_url }}"
+        username: "{{ infoblox_user }}"
+        password: "{{ infoblox_password }}"
+        name: "{{ vm.name }}.zorg.local"
+        state: absent
+      when: vm_ip is defined
+
+    - name: "Delete VM from vCenter"
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_host }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        validate_certs: no
+        name: "{{ vm.name }}"
+        state: absent
+        force: yes
+
+    - name: "Log cleanup action"
+      ansible.builtin.debug:
+        msg: "VM {{ vm.name }} deleted, IP {{ vm_ip }} released, DNS removed."
+

@@ -1,0 +1,27 @@
+---
+- name: Decommission VM
+  hosts: localhost
+  gather_facts: false
+  vars:
+    today_tag: "Needs to be removed - {{ lookup('pipe','date +%d%m%Y') }}"
+  tasks:
+    - name: Power off VM
+      community.vmware.vmware_guest_powerstate:
+        hostname: "{{ vcenter_host }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        validate_certs: no
+        name: "{{ hostname }}"
+        state: poweredoff
+
+    - name: Add decom tag to VM
+      community.vmware.vmware_tag_assignment:
+        hostname: "{{ vcenter_host }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        validate_certs: no
+        category: "Decommission"
+        name: "{{ today_tag }}"
+        object_name: "{{ hostname }}"
+        object_type: VirtualMachine
+

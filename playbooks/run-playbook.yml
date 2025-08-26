@@ -1,0 +1,8 @@
+---
+- name: Run selected playbook or roles
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Run dynamic playbook
+      ansible.builtin.include_tasks: "{{ playbook_name }}"
+

@@ -1,0 +1,17 @@
+---
+- name: Reserve an IP from Infoblox
+  community.general.infoblox_ip_assignment:
+    wapi_url: "{{ infoblox_wapi_url }}"
+    username: "{{ infoblox_user }}"
+    password: "{{ infoblox_password }}"
+    network_view: "{{ network_view }}"
+    network: "{{ network }}"
+    host: "{{ hostname }}"
+    state: present
+    force: yes
+  register: ip_reservation
+
+- name: Set reserved IP fact
+  set_fact:
+    reserved_ip: "{{ ip_reservation.ip }}"
+

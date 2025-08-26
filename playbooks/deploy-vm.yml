@@ -1,0 +1,53 @@
+---
+- name: Deploy VM from template
+  hosts: localhost
+  gather_facts: false
+  vars:
+    cluster_name: "DefaultCluster"
+    resource_pool: "DefaultPool"
+    network_name: "DefaultNetwork"
+    datastore_path: "ds:///vmfs/volumes/61d85396-5a4b8e15-490c-8a503280004a/Zuyderland/3PAR-03-TEMPLATES"
+  tasks:
+    - name: Reserve IP in Infoblox
+      include_role:
+        name: infoblox_reserve_ip
+      vars:
+        hostname: "{{ fqdn }}"
+
+    - name: Clone VM from template
+      community.vmware.vmware_guest:
+        hostname: "{{ vcenter_host }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        validate_certs: no
+        name: "{{ fqdn }}"
+        template: "{{ template_folder }}"
+        cluster: "{{ cluster_name }}"
+        resource_pool: "{{ resource_pool }}"
+        datastore: "{{ datastore_path }}"
+        networks:
+          - name: "{{ network_name }}"
+            ip: "{{ reserved_ip }}"
+            netmask: "255.255.255.0"
+            gateway: "{{ gateway }}"
+        hardware:
+          memory_mb: 4096
+          num_cpus: 2
+        wait_for_ip_address: yes
+
+    - name: Add extra disks
+      community.vmware.vmware_guest_disk:
+        hostname: "{{ vcenter_host }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        validate_certs: no
+        guest: "{{ fqdn }}"
+        disk:
+          size_gb: "{{ item.size }}"
+      loop: "{{ extra_disks | default([]) }}"
+
+    - name: Join domain if required
+      include_role:
+        name: domain_join
+      when: join_domain | bool
+

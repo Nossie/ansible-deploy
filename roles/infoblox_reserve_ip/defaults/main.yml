@@ -1,0 +1,8 @@
+---
+# Default variables
+infoblox_wapi_url: "https://infoblox.zorg.local/wapi/v2.13"
+infoblox_user: "{{ vault_infoblox_user }}"
+infoblox_password: "{{ vault_infoblox_pass }}"
+network_view: "default"
+network: "10.191.192.0/24"
+
