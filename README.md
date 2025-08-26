@@ -1,148 +1,125 @@
-🛠 Azure DevOps – Ansible + VMware + Infoblox Pipelines
+# Ansible Deploy Automation
 
-This repo integrates Ansible, VMware vCenter, and Infoblox into an interactive Azure DevOps pipeline wizard, with modular discovery pipelines for playbooks, roles, OS templates, VLANs, and clusters.
+This repository provides a modular and automated solution for deploying, decommissioning, and managing virtual machines (VMs) in a vCenter environment using Ansible. It integrates with Infoblox for IP and DNS management and supports interactive deployment workflows via Azure DevOps pipelines.
 
-📂 Repository Layout
+---
+
+## 🚀 Features
+
+- Deploy VMs from templates via vCenter
+- Reserve and release IP addresses and DNS entries using Infoblox
+- Join VMs to a domain (optional)
+- Decommission and clean up obsolete VMs
+- Interactive deployment wizard with dropdown menus
+- Modular discovery pipelines for dynamic parameter generation
+
+---
+
+## 📁 Repository Structure
+
+```
 .
-├── pipelines/
-│   ├── deploy-wizard.yml          # Main interactive deployment wizard with optional discovery refresh
-│   ├── discover-playbooks.yml     # Discover playbooks and roles
-│   ├── discover-os.yml            # Discover OS templates from datastore
-│   ├── discover-vlans.yml         # Discover VLANs
-│   ├── discover-cluster.yml       # Discover clusters/resource pools
-│   ├── discover-full.yml          # Runs all discovery pipelines sequentially
-│   └── discover-menu.yml          # Controller pipeline to select which discovery to run
-├── playbooks/                     # Ansible playbooks
-│   ├── deploy-vm.yml
-│   └── ...                        # other playbooks
-├── roles/                         # Ansible roles
-│   ├── domain_join/
-│   └── ...                        # other roles
+├── pipelines/                  # Azure DevOps pipeline templates
+│   ├── deploy-wizard.yml       # Main interactive deployment wizard
+│   ├── discover-*.yml          # Discovery templates for playbooks, OS, VLANs, clusters
+│   ├── discover-full.yml       # Runs all discovery templates
+│   └── discover-menu.yml       # Controller pipeline to select discovery target
+├── playbooks/                 # Ansible playbooks
+│   ├── deploy-vm.yml           # Deploy VM from template
+│   ├── decommission-vm.yml     # Tag and power off VM
+│   ├── cleanup-vms.yml         # Remove obsolete VMs and release IP/DNS
+│   └── run-playbook.yml        # Dynamically run selected playbook
+├── roles/                     # Ansible roles
+│   ├── infoblox_reserve_ip/    # Reserve IP in Infoblox
+│   ├── vm_cleanup/             # Release IP/DNS and delete VM
+│   └── domain_join/            # Join VM to domain
 ├── group_vars/
 │   └── all/
-│       └── vault.yml              # Encrypted sensitive info
+│       └── vault.yml           # Encrypted secrets
 └── README.md
+```
 
-🚀 Pipeline Actions
+---
 
-When you run the Deploy Wizard (pipelines/deploy-wizard.yml), you first select:
+## 🧩 Pipelines Overview
 
-Refresh Discovery Dropdowns? (boolean)
+### `deploy-wizard.yml`
+Interactive pipeline that:
+- Optionally refreshes dropdowns via discovery
+- Supports actions: New Deployment, Run Playbook, Decommission, Cleanup
+- Uses dropdowns populated by discovery pipelines
 
-If true → triggers pipelines/discover-menu.yml to refresh all dropdowns (playbooks, OS templates, VLANs, clusters) before running the action.
+### `discover-menu.yml`
+Selectively runs discovery templates to populate dropdowns:
+- Playbooks
+- OS templates
+- VLANs
+- Clusters
 
-Dropdowns remain static until discovery is refreshed again.
+### `discover-full.yml`
+Runs all discovery templates sequentially.
 
-Action Type (dropdown):
+### Discovery Templates (`discover-*.yml`)
+Each template generates a `pipeline-parameters.yml` file with dropdown values and publishes it as an artifact.
 
-New Deployment
+---
 
-Run Playbook/Role
+## 📜 Playbooks Overview
 
-Decommission VM
+### `deploy-vm.yml`
+- Reserves IP via Infoblox
+- Clones VM from template
+- Adds disks
+- Optionally joins domain
 
-Cleanup Obsolete VMs
+### `decommission-vm.yml`
+- Powers off VM
+- Tags VM for removal
 
-Dry Run (boolean) → simulates changes without applying them.
+### `cleanup-vms.yml`
+- Finds tagged VMs older than 7 days
+- Releases IP and DNS
+- Deletes VM
 
-1. New Deployment
+### `run-playbook.yml`
+- Dynamically runs a task-based playbook
 
-Clones a VM from templates in datastore (Zuyderland/3PAR-03-TEMPLATES)
+---
 
-Reserves IP from Infoblox
+## 🌐 Infoblox Integration
 
-Sets DNS record
+Ensure the following roles are configured:
+- `infoblox_reserve_ip`: Reserves IP and DNS
+- `vm_cleanup`: Releases IP and DNS, deletes VM
 
-Optional Domain Join (roles/domain_join/)
+These roles use Infoblox REST API with credentials stored in `vault.yml`.
 
-Asks for:
+---
 
-OS & Version (dropdown from discover-os.yml)
+## ⚙️ Requirements
 
-Hostname (free text, .zorg.local appended)
+- Ansible 2.10+
+- Python modules: `requests`, `community.vmware`, `community.general`
+- Access to vCenter and Infoblox
+- Azure DevOps pipeline agent (Ubuntu recommended)
 
-VLAN / Network (dropdown from discover-vlans.yml)
+---
 
-Disks (optional extra disks/sizes)
+## 📦 Azure DevOps Setup
 
-Cluster & Resource Pool (dropdown from discover-cluster.yml, defaults provided)
+Add the following pipelines to Azure DevOps:
 
-Runs Ansible playbooks/deploy-vm.yml
+1. `deploy-wizard.yml` — Main interactive pipeline
+2. `discover-menu.yml` — Discovery controller pipeline
+3. `discover-full.yml` — Full discovery pipeline
 
-2. Run Playbook/Role
+Ensure the repo is connected and accessible by the pipeline agent.
 
-Dropdowns for Playbooks (playbooks/) and Roles (roles/) discovered via discover-playbooks.yml
+---
 
-Supports tags and multiple roles
+## 📌 Usage
 
-Dry-run supported
-
-3. Decommission VM
-
-Ask for hostname
-
-Powers off VM in vCenter
-
-Adds tag: Needs to be removed - DDMMYYYY
-
-Releases Infoblox IP
-
-VM remains on datastore until cleanup
-
-4. Cleanup Obsolete VMs
-
-Finds VMs with tag Needs to be removed older than 7 days
-
-Removes VM from vCenter/datastore
-
-Cleans up DNS and Infoblox IP
-
-🔄 Discovery Pipelines
-
-We use modular discovery pipelines to populate dropdowns for the wizard:
-
-Pipeline	Purpose
-discover-playbooks.yml	Discover playbooks (playbooks/) and roles (roles/)
-discover-os.yml	Discover OS templates in datastore (vCenter folders)
-discover-vlans.yml	Discover VLANs
-discover-cluster.yml	Discover clusters and resource pools
-discover-full.yml	Runs all discovery pipelines sequentially
-discover-menu.yml	Controller pipeline: choose which discovery to run (playbooks, OS, VLANs, cluster, or full)
-
-Workflow:
-
-Run discover-menu.yml manually or via the wizard refresh option → generates pipelines/pipeline-parameters.yml.
-
-Commit updated pipeline-parameters.yml to repo → dropdowns are now static.
-
-Run deploy-wizard.yml → uses static dropdowns, but can optionally refresh via refresh_discovery = true.
-
-⚙️ Setup Steps
-
-Clone repo into Azure DevOps project.
-
-Create pipelines for discovery:
-
-discover-menu.yml → manual trigger to refresh dropdowns
-
-Create pipeline for Deploy Wizard:
-
-deploy-wizard.yml → interactive deployment and actions
-
-Run Deploy Wizard, optionally refreshing discovery first.
-
-Commit updated pipeline-parameters.yml after any discovery refresh.
-
-![Diagram](images/diagram.png "Diagram")
-
-✅ Notes
-
-Sensitive credentials are in group_vars/all/vault.yml (Ansible Vault).
-
-Dropdowns remain static until discovery pipelines are rerun.
-
-Dry-run mode (--check) is available for all actions.
-
-Decommissioned VMs are first tagged, then removed only during cleanup.
-
-OS templates, VLANs, clusters, etc., are dynamically discovered and mapped into dropdowns.
+1. Configure secrets in `group_vars/all/vault.yml`
+2. Run `deploy-wizard.yml` pipeline in Azure DevOps
+3. Select desired action and parameters via dropdowns
+4. Monitor deployment or cleanup progress
